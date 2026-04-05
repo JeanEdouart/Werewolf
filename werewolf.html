@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loup-Garou MJ Pro</title>
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --card-bg: #16213e;
+            --accent: #e94560;
+            --text: #e0e0e0;
+            --subtle: #454545;
+            --couple-color: #ff4757;
+            --mayor-color: #f1c40f;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0; padding: 10px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .container { max-width: 800px; width: 100%; }
+        h1 { text-align: center; color: var(--accent); letter-spacing: 2px; }
+
+        .section {
+            background: var(--card-bg);
+            padding: 20px; border-radius: 15px; margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .input-group { display: flex; gap: 8px; margin-bottom: 15px; }
+        input[type="text"] {
+            flex-grow: 1; padding: 12px; border-radius: 8px;
+            border: 1px solid var(--subtle); background: #0f3460; color: white;
+        }
+
+        button {
+            padding: 10px 15px; border-radius: 8px; border: none;
+            background-color: var(--accent); color: white;
+            font-weight: bold; cursor: pointer; transition: 0.2s;
+        }
+
+        button:active { transform: scale(0.95); }
+        button.secondary { background-color: #0f3460; border: 1px solid var(--accent); }
+        button.danger { background: #3d0814; color: #ff4757; font-size: 0.8em; }
+        button.mayor-btn { background: #443a05; color: var(--mayor-color); border: 1px solid var(--mayor-color); }
+        button.mayor-btn.active { background: var(--mayor-color); color: black; }
+
+        .setup-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255,255,255,0.05); padding: 8px 12px;
+            margin-bottom: 6px; border-radius: 6px;
+        }
+
+        .player-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;
+        }
+
+        .card {
+            background: #1a1a2e; padding: 15px; border-radius: 12px;
+            border-left: 5px solid var(--accent); position: relative; transition: 0.3s;
+        }
+
+        .card.dead { opacity: 0.3; filter: grayscale(1); border-left-color: #555; }
+        .card.in-love { border-left-color: var(--couple-color); border-right: 5px solid var(--couple-color); }
+        .card.is-mayor { border-top: 4px solid var(--mayor-color); box-shadow: 0 0 15px rgba(241, 196, 15, 0.2); }
+
+        #reveal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 10000; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🐺 Narrateur Loup-Garou</h1>
+
+    <div id="view-setup" class="section">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>Joueurs (<span id="count">0</span>)</h3>
+            <button class="danger" onclick="hardResetPlayers()">Tout effacer</button>
+        </div>
+        
+        <div class="input-group">
+            <input type="text" id="inName" placeholder="Nom du joueur..." autocomplete="off">
+            <button onclick="addUser()">Ajouter</button>
+        </div>
+        
+        <div id="list-users" style="max-height: 200px; overflow-y: auto; margin-bottom: 20px;"></div>
+
+        <hr style="border: 0; border-top: 1px solid var(--subtle); margin: 20px 0;">
+        
+        <h3>Rôles en jeu</h3>
+        <div id="roles-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;">
+            <label><input type="checkbox" class="r-check" value="Loup-Garou" checked> Loup</label>
+            <label><input type="checkbox" class="r-check" value="Loup-Garou" checked> Loup</label>
+            <label><input type="checkbox" class="r-check" value="Voyante" checked> Voyante</label>
+            <label><input type="checkbox" class="r-check" value="Sorcière" checked> Sorcière</label>
+            <label><input type="checkbox" class="r-check" value="Chasseur"> Chasseur</label>
+            <label><input type="checkbox" class="r-check" value="Cupidon"> Cupidon</label>
+            <label><input type="checkbox" class="r-check" value="Petite Fille"> P. Fille</label>
+        </div>
+        
+        <button onclick="startGame()" style="width: 100%; padding: 15px; margin-top: 20px; font-size: 1.1em;">Lancer la Partie</button>
+    </div>
+
+    <div id="view-game" class="section hidden">
+        <div style="display:flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+            <div style="display:flex; gap:5px;">
+                <button id="btn-cupid" class="secondary" onclick="enableCupidMode()">❤️ Couple</button>
+                <button id="btn-mayor" class="mayor-btn" onclick="enableMayorMode()">🎖️ Élire Maire</button>
+            </div>
+            <button class="danger" onclick="backToSetup()">Recommencer</button>
+        </div>
+        <div id="game-grid" class="player-grid"></div>
+    </div>
+</div>
+
+<div id="reveal-overlay">
+    <div style="padding: 20px;">
+        <h2 id="rev-name" style="color: #888;"></h2>
+        <p>Ton rôle secret est :</p>
+        <h1 id="rev-role" style="font-size: 4em; color: var(--accent); margin: 20px 0;"></h1>
+        <button onclick="closeReveal()" style="padding: 15px 40px;">Fermer</button>
+    </div>
+</div>
+
+<script>
+    let players = [];
+    let isCupidMode = false;
+    let isMayorMode = false;
+    let cupidSelection = [];
+
+    // Chargement auto des noms sauvegardés
+    window.onload = () => {
+        const saved = localStorage.getItem('lg_names');
+        if(saved) {
+            players = JSON.parse(saved).map(name => ({
+                id: Math.random(), name: name, role: '', alive: true, lover: false, mayor: false
+            }));
+        }
+        renderSetup();
+    };
+
+    function save() {
+        localStorage.setItem('lg_names', JSON.stringify(players.map(p => p.name)));
+    }
+
+    function addUser() {
+        const input = document.getElementById('inName');
+        if(!input.value.trim()) return;
+        players.push({ id: Math.random(), name: input.value.trim(), role: '', alive: true, lover: false, mayor: false });
+        input.value = ""; input.focus();
+        save(); renderSetup();
+    }
+
+    function removeUser(id) {
+        players = players.filter(p => p.id !== id);
+        save(); renderSetup();
+    }
+
+    function hardResetPlayers() {
+        if(confirm("Effacer tous les noms ?")) { players = []; save(); renderSetup(); }
+    }
+
+    function renderSetup() {
+        document.getElementById('count').innerText = players.length;
+        const container = document.getElementById('list-users');
+        container.innerHTML = players.map(p => `
+            <div class="setup-item">
+                <span>${p.name}</span>
+                <button onclick="removeUser(${p.id})" style="background:none; color:var(--accent);">✕</button>
+            </div>
+        `).join('');
+    }
+
+    function startGame() {
+        if(players.length < 1) return alert("Ajoutez des joueurs !");
+        const selectedRoles = Array.from(document.querySelectorAll('.r-check:checked')).map(c => c.value);
+        let pool = [...selectedRoles];
+        while(pool.length < players.length) pool.push("Villageois");
+        pool = pool.sort(() => Math.random() - 0.5);
+
+        players.forEach((p, i) => {
+            p.role = pool[i]; p.alive = true; p.lover = false; p.mayor = false;
+        });
+
+        document.getElementById('view-setup').classList.add('hidden');
+        document.getElementById('view-game').classList.remove('hidden');
+        renderGame();
+    }
+
+    function renderGame() {
+        const grid = document.getElementById('game-grid');
+        grid.innerHTML = players.map(p => `
+            <div class="card ${p.alive ? '' : 'dead'} ${p.lover ? 'in-love' : ''} ${p.mayor ? 'is-mayor' : ''}" 
+                 onclick="handleCardClick(${p.id})">
+                <div style="display:flex; justify-content:space-between;">
+                    <div>
+                        <strong>${p.mayor ? '🎖️ ' : ''}${p.name} ${p.lover ? '❤️' : ''}</strong><br>
+                        <span style="color: var(--accent); font-weight:bold;">${p.role}</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <button class="secondary" onclick="event.stopPropagation(); reveal(${p.id})">👁️</button>
+                        <button onclick="event.stopPropagation(); kill(${p.id})">${p.alive ? '💀' : '😇'}</button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function handleCardClick(id) {
+        if(isCupidMode) selectCupid(id);
+        else if(isMayorMode) selectMayor(id);
+    }
+
+    function kill(id) {
+        const p = players.find(x => x.id === id);
+        p.alive = !p.alive;
+        if(!p.alive) {
+            if(p.lover) {
+                const amant = players.find(x => x.lover && x.id !== id && x.alive);
+                if(amant) { alert(`${p.name} est mort... ${amant.name} se suicide par amour !`); amant.alive = false; }
+            }
+            if(p.mayor) { alert(`Le Maire ${p.name} est mort ! Il doit désigner un successeur.`); }
+        }
+        renderGame();
+    }
+
+    function enableCupidMode() {
+        isCupidMode = true; isMayorMode = false; cupidSelection = [];
+        document.getElementById('btn-cupid').innerText = "Cliquer sur les 2...";
+        renderGame();
+    }
+
+    function selectCupid(id) {
+        if(cupidSelection.includes(id)) return;
+        cupidSelection.push(id);
+        if(cupidSelection.length === 2) {
+            players.forEach(p => { if(cupidSelection.includes(p.id)) p.lover = true; });
+            isCupidMode = false;
+            document.getElementById('btn-cupid').innerText = "❤️ Couple";
+            renderGame();
+        }
+    }
+
+    function enableMayorMode() {
+        isMayorMode = true; isCupidMode = false;
+        document.getElementById('btn-mayor').innerText = "Cliquer sur l'élu...";
+        renderGame();
+    }
+
+    function selectMayor(id) {
+        players.forEach(p => p.mayor = (p.id === id));
+        isMayorMode = false;
+        document.getElementById('btn-mayor').innerText = "🎖️ Élire Maire";
+        renderGame();
+    }
+
+    function reveal(id) {
+        const p = players.find(x => x.id === id);
+        document.getElementById('rev-name').innerText = p.name;
+        document.getElementById('rev-role').innerText = p.role;
+        document.getElementById('reveal-overlay').style.display = 'flex';
+    }
+
+    function closeReveal() { document.getElementById('reveal-overlay').style.display = 'none'; }
+
+    function backToSetup() {
+        if(confirm("Relancer une partie avec les mêmes joueurs ?")) {
+            document.getElementById('view-setup').classList.remove('hidden');
+            document.getElementById('view-game').classList.add('hidden');
+        }
+    }
+
+    document.getElementById('inName').onkeydown = (e) => { if(e.key === 'Enter') addUser(); };
+</script>
+</body>
+</html>
